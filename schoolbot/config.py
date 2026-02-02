@@ -39,8 +39,21 @@ FEEDBACK_HISTORY_DAYS = int(os.environ.get("FEEDBACK_HISTORY_DAYS", "30"))
 
 # --- Selectors ---
 _selectors_path = PROJECT_ROOT / "selectors.yaml"
+OVERDUE_WHITELIST_FILE = PROJECT_ROOT / "overdue_whitelist.yaml"
 
 
 def load_selectors() -> dict:
     with open(_selectors_path) as f:
         return yaml.safe_load(f)
+
+
+def load_overdue_whitelist() -> dict:
+    if not OVERDUE_WHITELIST_FILE.exists():
+        return {"titles": [], "patterns": [], "courses": []}
+    with open(OVERDUE_WHITELIST_FILE) as f:
+        data = yaml.safe_load(f) or {}
+    return {
+        "titles": [t.lower() for t in (data.get("titles") or [])],
+        "patterns": [p.lower() for p in (data.get("patterns") or [])],
+        "courses": [c.lower() for c in (data.get("courses") or [])],
+    }

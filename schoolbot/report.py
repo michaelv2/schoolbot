@@ -521,16 +521,25 @@ def _parse_item_date(due_date: str) -> datetime | None:
 def _overdue_items(grades: list[dict], max_age_days: int = 30) -> list[dict]:
     """Find grade items with a past due date and no score.
 
-    Excludes 'class preparation' and 'class participation' items.
+    Excludes 'class preparation' and 'class participation' items,
+    plus anything matched by overdue_whitelist.yaml.
     """
+    whitelist = config.load_overdue_whitelist()
     now = datetime.now()
     cutoff = now - timedelta(days=max_age_days)
     results = []
     for g in grades:
+        course_name = g.get("course", "")
+        if course_name.lower() in whitelist["courses"]:
+            continue
         for item in g.get("items", []):
             title = item.get("title", "").lower()
             # Skip class preparation and participation items
             if "class preparation" in title or "class participation" in title:
+                continue
+            if title in whitelist["titles"]:
+                continue
+            if any(p in title for p in whitelist["patterns"]):
                 continue
 
             dt = _parse_item_date(item.get("due_date", ""))
