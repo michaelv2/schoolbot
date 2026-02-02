@@ -1,0 +1,52 @@
+# CSS selectors for Schoology pages.
+# Assignment selectors from CSS/JS analysis (unconfirmed — no assignments at capture time).
+# Grade selectors confirmed from real spike HTML.
+
+assignments:
+  # Each assignment item (excluding grouped sub-event blocks)
+  item: ".upcoming-event:not(.upcoming-subevents-block)"
+  # Within each item:
+  title: ".infotip a[href], .singleday a[href]"
+  course: ".realm-title-course-title .realm-main-titles, .course-title"
+  due_date: ".upcoming-time"
+
+grades:
+  # Each course block on the parent grade report
+  course_item: "li.s-grades-course-item"
+  # Course name (text inside the link within the title div)
+  course_name: ".gradebook-course-title a"
+  # The top-level "Course Grade" row for each course
+  course_row: "tr.course-row"
+  # Overall letter grade (e.g. "A+") — only present on some courses
+  letter_grade: ".grade-column .alpha-grade"
+  # Overall percentage (e.g. "100%") — only present on some courses
+  grade_percent: ".grade-column .rounded-grade"
+  # No-grade marker (dash) for courses without a computed grade
+  no_grade: ".grade-column .no-grade"
+
+  # Individual assignment rows (for detailed extraction)
+  item_row: "tr.item-row"
+  item_title: ".title a, .title"
+  item_awarded: ".awarded-grade .rounded-grade"
+  item_max: ".max-grade"
+  item_due_date: ".due-date"
+  item_comment: ".comment"
+
+  # Period/quarter rows
+  period_row: "tr.period-row"
+  # Category rows (e.g. "Classwork (30%)")
+  category_row: "tr.category-row"
+
+materials:
+  # Confirmed from real spike HTML (Jan 2026)
+  # Folders: <tr class="material-row-folder" id="f-{ID}">
+  folder: "tr.material-row-folder"
+  folder_name: ".folder-title a"
+  # Content items: <tr class="dr type-assignment|type-document" id="n-{ID}">
+  content_item: "tr.dr:not(.material-row-folder)"
+  # Assignment titles live in .item-title; document titles in .document-body-title
+  assignment_title: ".item-title a"
+  document_title: ".document-body-title a"
+  # Schoology page content (when navigated into a Page or assignment)
+  page_body: ".s-page-content, .page-body, #content-wrapper .content-body"
+  assignment_body: ".info-body .content, .assignment-description"

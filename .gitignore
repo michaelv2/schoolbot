@@ -1,0 +1,22 @@
+# Secrets & credentials
+.env
+.env.swp
+*.swp
+
+# Runtime data (contains student PII)
+cookies.json
+last_run.json
+grade_history.json
+feedback_history.json
+data/
+
+# Spike / dev artifacts
+spike_output/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# IDE / tools
+.claude/
