@@ -37,6 +37,11 @@ grades:
   # Category rows (e.g. "Classwork (30%)")
   category_row: "tr.category-row"
 
+login:
+  email: "#edit-mail"
+  password: "#edit-pass"
+  submit: "#edit-submit"
+
 materials:
   # Confirmed from real spike HTML (Jan 2026)
   # Folders: <tr class="material-row-folder" id="f-{ID}">

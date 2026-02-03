@@ -358,6 +358,29 @@ def _sort_by_due_date(assignments: list[dict]) -> list[dict]:
     return sorted(assignments, key=sort_key)
 
 
+def _filter_future_assignments(assignments: list[dict]) -> list[dict]:
+    """Remove assignments whose due date is today or earlier."""
+    tomorrow = (datetime.now() + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    results = []
+    for a in assignments:
+        due = a.get("due_date", "")
+        dt = None
+        for fmt in ("%b %d, %Y", "%m/%d/%y"):
+            try:
+                dt = datetime.strptime(due, fmt)
+                break
+            except ValueError:
+                continue
+        if dt is None:
+            results.append(a)  # keep items with unparseable dates
+            continue
+        if dt >= tomorrow:
+            results.append(a)
+    return results
+
+
 def _assignments_from_calendar(calendar_events: list[dict]) -> list[dict]:
     """Extract assignment-type calendar entries as upcoming assignments.
 
@@ -984,13 +1007,14 @@ def generate_and_send(data: dict, browser_page=None) -> None:
     if not assignments:
         # Parent accounts can't see /home/upcoming — use calendar events instead
         assignments = _sort_by_due_date(_assignments_from_calendar(calendar_events))
+    assignments = _filter_future_assignments(assignments)
 
     last = _load_last_run()
     prev_assignments = last["assignments"] if last else []
 
     new_assignments = _find_new_assignments(assignments, prev_assignments)
     low = _low_grades(grades)
-    tests = _upcoming_tests(assignments, calendar_events)
+    tests = _filter_future_assignments(_upcoming_tests(assignments, calendar_events))
     history = _update_grade_history(grades)
     recent = _recent_graded_items(grades, history)
     overdue = _overdue_items(grades)

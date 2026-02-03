@@ -66,13 +66,15 @@ def _download_materials(data: dict, headed: bool, course_filter: str = "", limit
         page.wait_for_load_state("networkidle")
 
         if not scraper._is_logged_in(page):
-            browser.close()
-            browser = pw.chromium.launch(headless=False)
-            context = browser.new_context()
-            page = context.new_page()
-            page.goto(config.SCHOOLOGY_BASE_URL)
-            page.wait_for_load_state("networkidle")
-            scraper._interactive_login(page)
+            if not headed:
+                if not scraper._auto_login(page, selectors):
+                    raise RuntimeError(
+                        "Session expired and no credentials configured for auto-login. "
+                        "Set SCHOOLOGY_EMAIL and SCHOOLOGY_PASSWORD in .env, or run "
+                        "with --headed to log in manually."
+                    )
+            else:
+                scraper._interactive_login(page)
 
         scraper._save_cookies(context)
 

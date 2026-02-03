@@ -25,6 +25,34 @@ def _interactive_login(page: Page) -> None:
     input()
 
 
+def _auto_login(page: Page, selectors: dict) -> bool:
+    """Fill the Schoology login form using credentials from config.
+
+    Returns True if login succeeded, False if credentials are missing.
+    Raises RuntimeError if the form was submitted but login still failed.
+    """
+    if not config.SCHOOLOGY_EMAIL or not config.SCHOOLOGY_PASSWORD:
+        return False
+
+    sel = selectors.get("login", {})
+    email_sel = sel.get("email", "#edit-mail")
+    pass_sel = sel.get("password", "#edit-pass")
+    submit_sel = sel.get("submit", "#edit-submit")
+
+    page.fill(email_sel, config.SCHOOLOGY_EMAIL)
+    page.fill(pass_sel, config.SCHOOLOGY_PASSWORD)
+    page.click(submit_sel)
+    page.wait_for_load_state("networkidle")
+
+    if not _is_logged_in(page):
+        raise RuntimeError(
+            "Auto-login failed — landed on login page after submitting credentials. "
+            "Check SCHOOLOGY_EMAIL / SCHOOLOGY_PASSWORD in .env, or run with --headed "
+            "to log in manually."
+        )
+    return True
+
+
 def _is_logged_in(page: Page) -> bool:
     """Heuristic: check if we landed on a login/SSO page."""
     url = page.url.lower()
@@ -695,14 +723,17 @@ def scrape(headed: bool = False) -> dict:
     page.wait_for_load_state("networkidle")
 
     if not _is_logged_in(page):
-        # Re-launch headed so the user can see the login page
-        browser.close()
-        browser = pw.chromium.launch(headless=False)
-        context = browser.new_context()
-        page = context.new_page()
-        page.goto(config.SCHOOLOGY_BASE_URL)
-        page.wait_for_load_state("networkidle")
-        _interactive_login(page)
+        if not headed:
+            # Headless mode: try auto-login with credentials from .env
+            if not _auto_login(page, selectors):
+                raise RuntimeError(
+                    "Session expired and no credentials configured for auto-login. "
+                    "Set SCHOOLOGY_EMAIL and SCHOOLOGY_PASSWORD in .env, or run "
+                    "with --headed to log in manually."
+                )
+        else:
+            # Headed mode: let the user log in interactively
+            _interactive_login(page)
 
     _save_cookies(context)
 

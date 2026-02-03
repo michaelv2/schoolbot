@@ -12,6 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCHOOLOGY_DOMAIN = os.environ["SCHOOLOGY_DOMAIN"]
 SCHOOLOGY_BASE_URL = f"https://{SCHOOLOGY_DOMAIN}"
 SCHOOLOGY_CHILD_ID = os.environ.get("SCHOOLOGY_CHILD_ID", "")
+SCHOOLOGY_EMAIL = os.environ.get("SCHOOLOGY_EMAIL", "")
+SCHOOLOGY_PASSWORD = os.environ.get("SCHOOLOGY_PASSWORD", "")
 
 # --- SMTP ---
 SMTP_HOST = os.environ["SMTP_HOST"]
