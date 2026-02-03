@@ -333,6 +333,233 @@ def _extract_page_text(page: Page, url: str, selectors: dict) -> str:
     return ""
 
 
+def _resolve_link_url(page: Page, href: str, selectors: dict) -> str:
+    """Navigate to a Schoology link detail page and extract the actual external URL.
+
+    Schoology wraps external links in /materials/link/view/ID pages.
+    Strategy:
+    1. Navigate to the link page — Schoology may auto-redirect to the target.
+    2. If still on Schoology, scrape the page for the external URL.
+    """
+    if not href:
+        return ""
+    original_url = href if href.startswith("http") else config.SCHOOLOGY_BASE_URL + href
+    schoology_host = config.SCHOOLOGY_DOMAIN.lower()
+    try:
+        page.goto(original_url)
+        page.wait_for_load_state("networkidle")
+
+        # Strategy 1: Check if the browser redirected away from Schoology.
+        # This is the most common case — Schoology link pages often redirect.
+        current = page.url
+        current_host = (re.search(r'://([^/]+)', current) or type('', (), {'group': lambda s, n: ''})()).group(1).lower()
+        if current_host and current_host != schoology_host and "accounts.google.com" not in current:
+            return current
+
+        # Strategy 2: Scrape the link detail page for the external URL.
+        external_url = page.evaluate("""(schoologyHost) => {
+            // Look for the URL displayed as text or in a link on the page.
+            // Schoology link pages typically show the URL in a few places:
+
+            // 1. The link URL shown as text (often in a <p> or <span>)
+            const allText = document.body ? document.body.innerText : '';
+            const urlMatch = allText.match(/https?:\\/\\/[^\\s<>"]+/);
+
+            // 2. Links in the content area pointing externally
+            const contentLinks = document.querySelectorAll(
+                '.info-body a[href], .link-main a[href], .s-link-content a[href], ' +
+                'a.link-btn, #content-wrapper a[href], .content-body a[href]'
+            );
+            for (const el of contentLinks) {
+                const href = el.getAttribute('href') || '';
+                if (href.startsWith('http') && !href.includes(schoologyHost) &&
+                    !href.includes('/materials/') && !href.startsWith('#')) {
+                    return href;
+                }
+            }
+
+            // 3. Iframe src pointing externally
+            const iframe = document.querySelector('iframe[src]');
+            if (iframe) {
+                const src = iframe.getAttribute('src') || '';
+                if (src.startsWith('http') && !src.includes(schoologyHost)) {
+                    return src;
+                }
+            }
+
+            // 4. Fall back to URL found in page text
+            if (urlMatch && !urlMatch[0].includes(schoologyHost)) {
+                return urlMatch[0];
+            }
+
+            return '';
+        }""", schoology_host)
+        return external_url
+    except Exception:
+        return ""
+
+
+def _detect_google_login(page: Page) -> bool:
+    """Check if the current page is a Google login/authentication page."""
+    url = page.url.lower()
+    return (
+        "accounts.google.com" in url
+        or "accounts.youtube.com" in url
+        or ("google.com" in url and "/signin" in url)
+    )
+
+
+def _reclassify_by_url(url: str) -> str:
+    """Determine the effective item type from a resolved URL path.
+
+    Schoology "link" items often wrap assignments, pages, files, or even
+    sub-folders. After resolving the actual URL, re-classify so the
+    downloader can handle them correctly.
+    """
+    if not url:
+        return ""
+    if "/assignment/" in url:
+        return "assignment"
+    if "/page/" in url:
+        return "page"
+    if "/file/" in url:
+        return "file"
+    if "/assessments/" in url:
+        return "assignment"  # treat assessments like assignments for text extraction
+    if "materials?f=" in url or "/materials/" in url:
+        return "folder_ref"
+    return ""
+
+
+def _extract_folder_id_from_url(url: str) -> str:
+    """Extract folder ID from a materials URL like /course/ID/materials?f=FOLDER_ID."""
+    m = re.search(r'materials\?f=(\d+)', url)
+    return m.group(1) if m else ""
+
+
+def _crawl_materials_recursive(
+    page: Page,
+    course_id: str,
+    folder_id: str,
+    selectors: dict,
+    depth: int = 0,
+    max_depth: int = 4,
+    parent_path: str = "",
+    _visited_folders: set | None = None,
+    _leaf_count: list | None = None,
+    max_leaves: int = 0,
+) -> list[dict]:
+    """Recursively crawl a folder's materials, resolving links and descending into sub-folders.
+
+    If max_leaves > 0, stops crawling once that many leaf (non-folder) items
+    have been collected. _leaf_count is a mutable [int] shared across recursion.
+
+    Returns a tree of items:
+    [{name, type, href, resolved_url, folder_path, children: [...]}]
+    """
+    if depth > max_depth:
+        return []
+
+    if _visited_folders is None:
+        _visited_folders = set()
+    if _leaf_count is None:
+        _leaf_count = [0]
+
+    # Stop crawling if we already have enough items
+    if max_leaves and _leaf_count[0] >= max_leaves:
+        return []
+
+    # Avoid visiting the same folder twice (link items can create cycles)
+    folder_key = folder_id or "root"
+    if folder_key in _visited_folders:
+        return []
+    _visited_folders.add(folder_key)
+
+    if folder_id:
+        page.goto(_folder_url(course_id, folder_id))
+    else:
+        page.goto(_materials_url(course_id))
+    page.wait_for_load_state("networkidle")
+
+    items = _extract_materials_from_page(page, selectors)
+    result = []
+
+    for item in items:
+        # Check limit before processing each item
+        if max_leaves and _leaf_count[0] >= max_leaves:
+            break
+
+        item["folder_path"] = parent_path
+        item["resolved_url"] = ""
+        item["children"] = []
+
+        if item["type"] == "folder" and item.get("folder_id"):
+            # Recurse into sub-folder
+            subfolder_path = f"{parent_path}/{item['name']}" if parent_path else item["name"]
+            children = _crawl_materials_recursive(
+                page, course_id, item["folder_id"], selectors,
+                depth=depth + 1, max_depth=max_depth,
+                parent_path=subfolder_path,
+                _visited_folders=_visited_folders,
+                _leaf_count=_leaf_count, max_leaves=max_leaves,
+            )
+            item["children"] = children
+            result.append(item)
+
+        elif item["type"] == "link" and item.get("href"):
+            # Resolve the actual URL behind Schoology's link wrapper
+            resolved = _resolve_link_url(page, item["href"], selectors)
+            item["resolved_url"] = resolved
+
+            # Re-classify based on what the link actually points to
+            effective_type = _reclassify_by_url(resolved)
+
+            if effective_type == "folder_ref":
+                # Link points to a sub-folder — recurse into it
+                sub_fid = _extract_folder_id_from_url(resolved)
+                if sub_fid:
+                    subfolder_path = f"{parent_path}/{item['name']}" if parent_path else item["name"]
+                    item["type"] = "folder"
+                    item["folder_id"] = sub_fid
+                    children = _crawl_materials_recursive(
+                        page, course_id, sub_fid, selectors,
+                        depth=depth + 1, max_depth=max_depth,
+                        parent_path=subfolder_path,
+                        _visited_folders=_visited_folders,
+                        _leaf_count=_leaf_count, max_leaves=max_leaves,
+                    )
+                    item["children"] = children
+                    result.append(item)
+                else:
+                    # Couldn't extract folder ID — keep as leaf
+                    _leaf_count[0] += 1
+                    result.append(item)
+            elif effective_type:
+                # Re-type the item (assignment, page, file, etc.)
+                item["type"] = effective_type
+                # Use the resolved URL as the primary href for downloading
+                item["href"] = resolved
+                _leaf_count[0] += 1
+                result.append(item)
+            else:
+                # Genuine external link or unrecognized — keep as-is
+                _leaf_count[0] += 1
+                result.append(item)
+
+            # Navigate back to the folder we were in
+            if folder_id:
+                page.goto(_folder_url(course_id, folder_id))
+            else:
+                page.goto(_materials_url(course_id))
+            page.wait_for_load_state("networkidle")
+
+        else:
+            _leaf_count[0] += 1
+            result.append(item)
+
+    return result
+
+
 def extract_course_materials(
     page: Page,
     course_id: str,

@@ -358,6 +358,37 @@ def _sort_by_due_date(assignments: list[dict]) -> list[dict]:
     return sorted(assignments, key=sort_key)
 
 
+def _assignments_from_calendar(calendar_events: list[dict]) -> list[dict]:
+    """Extract assignment-type calendar entries as upcoming assignments.
+
+    Parent accounts can't see /home/upcoming, so calendar assignment events
+    serve as the fallback source for the upcoming assignments section.
+    """
+    now = datetime.now()
+    results = []
+    for ev in calendar_events:
+        if ev.get("type") != "assignment":
+            continue
+        try:
+            dt = datetime.fromisoformat(ev["start"].replace("Z", "+00:00"))
+            # Strip timezone for comparison with naive datetime.now()
+            dt = dt.replace(tzinfo=None)
+            if ev.get("all_day", False) or dt.hour < 6:
+                dt = dt - timedelta(hours=5)
+            # Only include future assignments
+            if dt < now:
+                continue
+            due_date = dt.strftime("%b %d, %Y")
+        except (ValueError, KeyError, TypeError):
+            due_date = ""
+        results.append({
+            "title": ev["title"],
+            "course": "",
+            "due_date": due_date,
+        })
+    return results
+
+
 def _upcoming_tests(assignments: list[dict], calendar_events: list[dict]) -> list[dict]:
     """Find upcoming tests/quizzes/exams from both assignments and calendar events."""
     tests = []
@@ -525,6 +556,8 @@ def _overdue_items(grades: list[dict], max_age_days: int = 30) -> list[dict]:
     plus anything matched by overdue_whitelist.yaml.
     """
     whitelist = config.load_overdue_whitelist()
+    # Normalize whitespace in whitelist titles to handle Schoology quirks
+    wl_titles = [re.sub(r'\s+', ' ', t) for t in whitelist["titles"]]
     now = datetime.now()
     cutoff = now - timedelta(days=max_age_days)
     results = []
@@ -534,12 +567,14 @@ def _overdue_items(grades: list[dict], max_age_days: int = 30) -> list[dict]:
             continue
         for item in g.get("items", []):
             title = item.get("title", "").lower()
+            # Normalize whitespace for matching
+            title_normalized = re.sub(r'\s+', ' ', title)
             # Skip class preparation and participation items
             if "class preparation" in title or "class participation" in title:
                 continue
-            if title in whitelist["titles"]:
+            if title_normalized in wl_titles:
                 continue
-            if any(p in title for p in whitelist["patterns"]):
+            if any(p in title_normalized for p in whitelist["patterns"]):
                 continue
 
             dt = _parse_item_date(item.get("due_date", ""))
@@ -942,15 +977,19 @@ def generate_and_send(data: dict, browser_page=None) -> None:
     If browser_page is provided and ENABLE_TEST_PREP is on, will scrape
     course materials and generate study guides for upcoming tests.
     """
-    assignments = _sort_by_due_date(data["assignments"])
     grades = data["grades"]
+    calendar_events = data.get("calendar_events", [])
+
+    assignments = _sort_by_due_date(data["assignments"])
+    if not assignments:
+        # Parent accounts can't see /home/upcoming — use calendar events instead
+        assignments = _sort_by_due_date(_assignments_from_calendar(calendar_events))
 
     last = _load_last_run()
     prev_assignments = last["assignments"] if last else []
 
     new_assignments = _find_new_assignments(assignments, prev_assignments)
     low = _low_grades(grades)
-    calendar_events = data.get("calendar_events", [])
     tests = _upcoming_tests(assignments, calendar_events)
     history = _update_grade_history(grades)
     recent = _recent_graded_items(grades, history)

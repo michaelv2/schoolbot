@@ -159,7 +159,7 @@ def generate_student_feedback(
         due_date_str = t.get('due_date', '')
         course = t.get('course', '')
 
-        # Try to parse the date and add day of week
+        # Try to parse the date and add day of week + relative context
         if due_date_str:
             try:
                 # Handle format like "2/03/26" or "2/3/26"
@@ -168,8 +168,17 @@ def generate_student_feedback(
                     month, day, year = parts
                     year_full = f"20{year}" if len(year) == 2 else year
                     test_dt = datetime(int(year_full), int(month), int(day))
-                    day_of_week = test_dt.strftime('%A')
-                    due_date_str = f"{day_of_week} {due_date_str}"
+                    test_day_name = test_dt.strftime('%A')
+                    days_until = (test_dt.date() - now.date()).days
+                    if days_until == 0:
+                        relative = "(TODAY)"
+                    elif days_until == 1:
+                        relative = "(TOMORROW)"
+                    elif days_until > 1:
+                        relative = f"(in {days_until} days)"
+                    else:
+                        relative = ""
+                    due_date_str = f"{test_day_name} {due_date_str} {relative}".strip()
             except (ValueError, IndexError):
                 pass  # Keep original format if parsing fails
 
@@ -204,6 +213,24 @@ def generate_student_feedback(
                 history_lines.append(f"  {date} joke: {joke}")
     history_summary = "\n".join(history_lines) if history_lines else "  (no recent feedback)"
 
+    # Track which courses/subjects were recently praised to avoid repetition
+    subject_keywords = [
+        "music", "p.e.", "pe", "phys ed", "math", "english",
+        "science", "spanish", "social studies", "technology", "keystone",
+    ]
+    recently_praised = set()
+    for entry in recent_feedback[-5:]:
+        enc = entry.get("components", {}).get("encouragement", "").lower()
+        for kw in subject_keywords:
+            if kw in enc:
+                recently_praised.add(kw.upper() if kw in ("p.e.", "pe") else kw.title())
+    # Merge PE variants into canonical "P.E."
+    pe_variants = {"Pe", "PE", "P.E.", "Phys Ed"}
+    if recently_praised & pe_variants:
+        recently_praised -= pe_variants
+        recently_praised.add("P.E.")
+    praised_summary = ", ".join(sorted(recently_praised)) if recently_praised else ""
+
     # Build persistent issues list
     issue_lines = []
     for key, issue in persistent_issues.items():
@@ -237,6 +264,7 @@ def generate_student_feedback(
         f"IMPORTANT: Review the recent feedback history above and vary your messaging and jokes "
         f"to avoid repetition. However, if there are persistent issues listed, you may repeat "
         f"concerns about those specific problems.\n\n"
+        f"{f'SUBJECTS ALREADY PRAISED RECENTLY: {praised_summary}. DO NOT mention these courses again — pick different courses, specific recent scores, or upcoming events to highlight instead.' + chr(10) + chr(10) if praised_summary else ''}"
         f"Do NOT use markdown. Output plain text only."
     )
 

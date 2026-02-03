@@ -2,18 +2,17 @@
 # Items matching any rule below are excluded from the overdue section.
 
 # Exact title matches (case-insensitive)
-titles: []
+titles:
   # - "Chapter 5 Reading Response"
   # - "Lab Safety Agreement"
-  # - "Examen de Cap. 11"
-  # - "THE ROARING 20s textbook HW 1 & 2"
-  # - "Roaring 20s Textbook HW 3 & 4"
+  - "THE ROARING 20s textbook HW 1 & 2"
+  - "Roaring 20s Textbook HW 3 & 4"
 
 # Substring matches — any overdue item whose title contains these (case-insensitive)
-patterns: []
+patterns:
   # - "optional"
   # - "extra credit"
 
 # Suppress all overdue for entire courses (case-insensitive)
-courses: []
+courses:
   # - "Physical Education"

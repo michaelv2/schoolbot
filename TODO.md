@@ -1,3 +1,4 @@
 #### [ ] Color coding grades
 #### [ ] Pretty email formatting (spacing / colors to delineate sections)
-#### [ ] Overdue assignment whitelist
+#### [ ] Simplify class folder names
+#### [ ] Fix missing assignments

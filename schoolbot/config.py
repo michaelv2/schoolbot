@@ -31,6 +31,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
 
 # --- Paths ---
+MATERIALS_DIR = PROJECT_ROOT / "data" / "materials"
 COOKIES_FILE = PROJECT_ROOT / "cookies.json"
 LAST_RUN_FILE = PROJECT_ROOT / "last_run.json"
 GRADE_HISTORY_FILE = PROJECT_ROOT / "grade_history.json"
