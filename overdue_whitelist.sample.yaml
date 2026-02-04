@@ -1,12 +1,11 @@
 # Overdue assignment whitelist
 # Items matching any rule below are excluded from the overdue section.
+# Copy this file to overdue_whitelist.yaml and customize as needed.
 
 # Exact title matches (case-insensitive)
 titles:
   # - "Chapter 5 Reading Response"
   # - "Lab Safety Agreement"
-  - "THE ROARING 20s textbook HW 1 & 2"
-  - "Roaring 20s Textbook HW 3 & 4"
 
 # Substring matches — any overdue item whose title contains these (case-insensitive)
 patterns:

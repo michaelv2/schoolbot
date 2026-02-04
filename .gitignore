@@ -8,6 +8,7 @@ cookies.json
 last_run.json
 grade_history.json
 feedback_history.json
+overdue_whitelist.yaml
 data/
 
 # Spike / dev artifacts
