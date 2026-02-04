@@ -681,6 +681,63 @@ def _get_period_labels(grades: list[dict]) -> list[str]:
     return sorted(labels)
 
 
+def _todays_focus(
+    assignments: list[dict],
+    upcoming_tests: list[dict],
+    low_grades: list[dict],
+    overdue: list[dict],
+    recent_items: list[dict],
+) -> list[dict]:
+    """Select up to 4 focus items for today's work blocks.
+
+    Priority order: overdue → test prep → low-grade review → upcoming homework.
+    """
+    items: list[dict] = []
+    used_titles: set[str] = set()
+
+    def _course_suffix(course: str) -> str:
+        return f" ({course})" if course else ""
+
+    # 1. Overdue — nearest-due item
+    if overdue:
+        o = overdue[0]  # already sorted by due_date
+        items.append({
+            "action": f"Finish overdue: {o['title']}{_course_suffix(o['course'])}",
+            "detail": o["course"],
+        })
+        used_titles.add(o["title"])
+
+    # 2. Test prep — nearest upcoming test
+    if upcoming_tests and len(items) < 4:
+        t = upcoming_tests[0]
+        items.append({
+            "action": f"Study for {t['title']}{_course_suffix(t['course'])}",
+            "detail": t["course"],
+        })
+        used_titles.add(t["title"])
+
+    # 3. Low-grade review — lowest-grade course
+    if low_grades and len(items) < 4:
+        lowest = min(low_grades, key=lambda g: _effective_grade(g) or 100)
+        eff = _effective_grade(lowest)
+        pct = f"{eff:.0f}%" if eff is not None else "low"
+        items.append({
+            "action": f"Review {lowest['course']} \u2014 grade is {pct}",
+            "detail": lowest["course"],
+        })
+
+    # 4. Upcoming homework — nearest-due that isn't already picked
+    if assignments and len(items) < 4:
+        for a in assignments:
+            if a["title"] not in used_titles:
+                items.append({
+                    "action": f"Work on {a['title']}{_course_suffix(a['course'])}",
+                    "detail": a["course"],
+                })
+                break
+
+    return items[:4]
+
 
 def _render_html(
     assignments: list[dict],
@@ -692,6 +749,7 @@ def _render_html(
     overdue: list[dict],
     test_prep: dict | None = None,
     student_feedback: str = "",
+    focus_items: list[dict] | None = None,
 ) -> str:
     now = datetime.now().strftime("%B %d, %Y %I:%M %p")
     th = 'style="text-align:left;padding:8px;border-bottom:1px solid #ddd;"'
@@ -804,6 +862,32 @@ def _render_html(
 
     q_headers = "".join(f'\n                <th {th}>{q}</th>' for q in display_periods)
 
+    # Today's Focus section
+    focus_items = focus_items or []
+    if focus_items:
+        focus_rows = ""
+        for fi in focus_items:
+            focus_rows += f"""
+            <div style="margin-bottom:16px;">
+                <span style="font-size:18px;">&#9744;</span>
+                <strong>{fi['action']}</strong>
+                <div style="color:#888;font-size:13px;margin:4px 0 0 26px;">
+                    Write &ldquo;done&rdquo; criteria: ________________________________
+                </div>
+            </div>"""
+        focus_html = f"""
+        <h3>Today's Focus</h3>
+        <p style="color:#666;font-size:14px;">Plan your work in 15\u201320 min blocks.</p>
+        <div style="border-left:4px solid #27ae60;background:#f0faf0;padding:12px 16px;margin:16px 0;">
+            {focus_rows}
+        </div>"""
+    else:
+        focus_html = """
+        <h3>Today's Focus</h3>
+        <div style="border-left:4px solid #27ae60;background:#f0faf0;padding:12px 16px;margin:16px 0;">
+            <p style="color:#27ae60;font-size:15px;">All caught up! Nothing urgent today \u2014 great job staying on top of things.</p>
+        </div>"""
+
     return f"""
     <html>
     <body style="font-family:sans-serif;max-width:800px;margin:auto;padding:16px;">
@@ -836,6 +920,8 @@ def _render_html(
             </tr>
             {assignment_rows}
         </table>'''}
+
+        {focus_html}
 
         {"" if not overdue else f'''
         <h3 style="color:#e74c3c;">Overdue Assignments ({len(overdue)})</h3>
@@ -1124,10 +1210,13 @@ def generate_and_send(data: dict, browser_page=None) -> None:
             else:
                 print(f"  Feedback too similar to recent history, regenerating...")
 
+    focus = _todays_focus(assignments, tests, low, overdue, recent)
+
     html = _render_html(
         assignments, new_assignments, grades, low, tests, recent, overdue,
         test_prep=test_prep,
         student_feedback=student_feedback,
+        focus_items=focus,
     )
 
     subject = f"SchoolBot: {len(assignments)} assignments"
