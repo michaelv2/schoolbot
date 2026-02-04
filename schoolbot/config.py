@@ -20,8 +20,9 @@ SMTP_HOST = os.environ["SMTP_HOST"]
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ["SMTP_USER"]
 SMTP_PASSWORD = os.environ["SMTP_PASSWORD"]
-# EMAIL_TO can be a single address or comma-separated list
-EMAIL_TO = [addr.strip() for addr in os.environ["EMAIL_TO"].split(",")]
+# Recipient lists (comma-separated)
+STUDENT_EMAIL_TO = [addr.strip() for addr in os.environ["STUDENT_EMAIL_TO"].split(",")]
+PARENT_EMAIL_TO = [addr.strip() for addr in os.environ["PARENT_EMAIL_TO"].split(",")]
 EMAIL_FROM = os.environ.get("EMAIL_FROM", SMTP_USER)
 
 # --- Thresholds ---

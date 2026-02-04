@@ -750,6 +750,7 @@ def _render_html(
     test_prep: dict | None = None,
     student_feedback: str = "",
     focus_items: list[dict] | None = None,
+    variant: str = "student",
 ) -> str:
     now = datetime.now().strftime("%B %d, %Y %I:%M %p")
     th = 'style="text-align:left;padding:8px;border-bottom:1px solid #ddd;"'
@@ -888,13 +889,56 @@ def _render_html(
             <p style="color:#27ae60;font-size:15px;">All caught up! Nothing urgent today \u2014 great job staying on top of things.</p>
         </div>"""
 
+    is_student = variant == "student"
+    bot_name = "SchoolBot" if is_student else "ParentBot"
+
+    # Student-only sections
+    feedback_section = ""
+    if is_student and student_feedback:
+        feedback_section = (
+            '<div style="background:#f0f7ff;border-left:4px solid #3498db;'
+            'padding:12px 16px;margin:16px 0;font-size:15px;line-height:1.5;">'
+            + student_feedback.replace(chr(10), "<br>") + '</div>'
+        )
+
+    focus_section = focus_html if is_student else ""
+
+    # Parent-only sections
+    grades_section = ""
+    recent_section = ""
+    if not is_student:
+        grades_section = f"""
+        <h3>Grades ({len(grades)} courses)</h3>
+        {"<p>No grades found.</p>" if not grades else f'''
+        <table style="border-collapse:collapse;width:100%;">
+            <tr style="background:#f4f4f4;">
+                <th {th}>Course</th>
+                <th {th}>Overall</th>
+                <th {th}>Letter</th>{q_headers}
+            </tr>
+            {grade_rows}
+        </table>'''}"""
+
+        recent_section = f"""
+        <h3>Recent Grades (Past 2 Weeks)</h3>
+        {"<p>No graded items in the past two weeks.</p>" if not recent_items else f'''
+        <table style="border-collapse:collapse;width:100%;">
+            <tr style="background:#f4f4f4;">
+                <th {th}>Date</th>
+                <th {th}>Course</th>
+                <th {th}>Item</th>
+                <th {th}>Score</th>
+            </tr>
+            {recent_rows}
+        </table>'''}"""
+
     return f"""
     <html>
     <body style="font-family:sans-serif;max-width:800px;margin:auto;padding:16px;">
-        <h2>SchoolBot Report</h2>
+        <h2>{bot_name} Report</h2>
         <p style="color:#666;">Generated {now}</p>
 
-        {'<div style="background:#f0f7ff;border-left:4px solid #3498db;padding:12px 16px;margin:16px 0;font-size:15px;line-height:1.5;">' + student_feedback.replace(chr(10), "<br>") + '</div>' if student_feedback else ""}
+        {feedback_section}
 
         {warnings}
 
@@ -921,8 +965,6 @@ def _render_html(
             {assignment_rows}
         </table>'''}
 
-        {focus_html}
-
         {"" if not overdue else f'''
         <h3 style="color:#e74c3c;">Overdue Assignments ({len(overdue)})</h3>
         <table style="border-collapse:collapse;width:100%;">
@@ -934,31 +976,14 @@ def _render_html(
             {overdue_rows}
         </table>'''}
 
-        <h3>Grades ({len(grades)} courses)</h3>
-        {"<p>No grades found.</p>" if not grades else f'''
-        <table style="border-collapse:collapse;width:100%;">
-            <tr style="background:#f4f4f4;">
-                <th {th}>Course</th>
-                <th {th}>Overall</th>
-                <th {th}>Letter</th>{q_headers}
-            </tr>
-            {grade_rows}
-        </table>'''}
+        {focus_section}
 
-        <h3>Recent Grades (Past 2 Weeks)</h3>
-        {"<p>No graded items in the past two weeks.</p>" if not recent_items else f'''
-        <table style="border-collapse:collapse;width:100%;">
-            <tr style="background:#f4f4f4;">
-                <th {th}>Date</th>
-                <th {th}>Course</th>
-                <th {th}>Item</th>
-                <th {th}>Score</th>
-            </tr>
-            {recent_rows}
-        </table>'''}
+        {grades_section}
+
+        {recent_section}
 
         <p style="color:#999;font-size:12px;margin-top:24px;">
-            Sent by SchoolBot
+            Sent by {bot_name}
         </p>
     </body>
     </html>
@@ -968,6 +993,7 @@ def _render_html(
 def _send_email(
     subject: str,
     html_body: str,
+    recipients: list[str],
     attachments: list[tuple[str, str]] | None = None,
 ) -> None:
     """Send an HTML email, optionally with file attachments.
@@ -990,12 +1016,12 @@ def _send_email(
 
     msg["Subject"] = subject
     msg["From"] = config.EMAIL_FROM
-    msg["To"] = ", ".join(config.EMAIL_TO)
+    msg["To"] = ", ".join(recipients)
 
     with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
         server.starttls()
         server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-        server.sendmail(config.EMAIL_FROM, config.EMAIL_TO, msg.as_string())
+        server.sendmail(config.EMAIL_FROM, recipients, msg.as_string())
 
 
 # Map topic keywords found in test titles to school subject names.
@@ -1212,34 +1238,51 @@ def generate_and_send(data: dict, browser_page=None) -> None:
 
     focus = _todays_focus(assignments, tests, low, overdue, recent)
 
-    html = _render_html(
+    # --- Build subject line parts (shared) ---
+    subject_parts = f"{len(assignments)} assignments"
+    if tests:
+        subject_parts += f", {len(tests)} upcoming test{'s' if len(tests) != 1 else ''}"
+    if overdue:
+        subject_parts += f", {len(overdue)} overdue"
+    if low:
+        subject_parts += f", {len(low)} low grade{'s' if len(low) != 1 else ''}"
+    if new_assignments:
+        subject_parts += f" ({len(new_assignments)} new)"
+
+    # --- Student email (SchoolBot) ---
+    student_html = _render_html(
         assignments, new_assignments, grades, low, tests, recent, overdue,
         test_prep=test_prep,
         student_feedback=student_feedback,
         focus_items=focus,
+        variant="student",
     )
-
-    subject = f"SchoolBot: {len(assignments)} assignments"
-    if tests:
-        subject += f", {len(tests)} upcoming test{'s' if len(tests) != 1 else ''}"
-    if overdue:
-        subject += f", {len(overdue)} overdue"
-    if low:
-        subject += f", {len(low)} low grade{'s' if len(low) != 1 else ''}"
-    if new_assignments:
-        subject += f" ({len(new_assignments)} new)"
+    student_subject = f"SchoolBot: {subject_parts}"
     if attachments:
-        subject += " + study guides"
+        student_subject += " + study guides"
 
-    _send_email(subject, html, attachments=attachments if attachments else None)
+    _send_email(student_subject, student_html, config.STUDENT_EMAIL_TO,
+                attachments=attachments if attachments else None)
+    print(f"SchoolBot report sent to {', '.join(config.STUDENT_EMAIL_TO)}")
+
+    # --- Parent email (ParentBot) ---
+    parent_html = _render_html(
+        assignments, new_assignments, grades, low, tests, recent, overdue,
+        test_prep=test_prep,
+        variant="parent",
+    )
+    parent_subject = f"ParentBot: {subject_parts}"
+
+    _send_email(parent_subject, parent_html, config.PARENT_EMAIL_TO)
+    print(f"ParentBot report sent to {', '.join(config.PARENT_EMAIL_TO)}")
+
     _save_run(data)
 
-    recipients = ", ".join(config.EMAIL_TO)
-    print(f"Report sent to {recipients}")
+    # --- Summary ---
     if tests:
         print(f"  {len(tests)} upcoming test(s)/quiz(zes)")
     if attachments:
-        print(f"  {len(attachments)} study guide(s) attached")
+        print(f"  {len(attachments)} study guide(s) attached (student email)")
     if overdue:
         print(f"  {len(overdue)} overdue assignment(s)")
     if new_assignments:
