@@ -404,9 +404,18 @@ def _assignments_from_calendar(calendar_events: list[dict]) -> list[dict]:
             due_date = dt.strftime("%b %d, %Y")
         except (ValueError, KeyError, TypeError):
             due_date = ""
+        # Try to extract course_id from event URL (e.g. /course/123/...)
+        course_id = ""
+        url = ev.get("url", "")
+        if "/course/" in url:
+            m = re.search(r"/course/(\d+)/", url)
+            if m:
+                course_id = m.group(1)
+
         results.append({
             "title": ev["title"],
             "course": "",
+            "course_id": course_id,
             "due_date": due_date,
         })
     return results
@@ -940,6 +949,8 @@ def _render_html(
 
         {feedback_section}
 
+        {focus_section}
+
         {warnings}
 
         <h3>Upcoming Tests / Quizzes</h3>
@@ -975,8 +986,6 @@ def _render_html(
             </tr>
             {overdue_rows}
         </table>'''}
-
-        {focus_section}
 
         {grades_section}
 
@@ -1120,6 +1129,12 @@ def generate_and_send(data: dict, browser_page=None) -> None:
         # Parent accounts can't see /home/upcoming — use calendar events instead
         assignments = _sort_by_due_date(_assignments_from_calendar(calendar_events))
     assignments = _filter_future_assignments(assignments)
+
+    # Fill in course names for calendar-sourced assignments using grades data
+    course_id_map = {g.get("course_id", ""): g["course"] for g in grades if g.get("course_id")}
+    for a in assignments:
+        if not a.get("course") and a.get("course_id"):
+            a["course"] = course_id_map.get(a["course_id"], "")
 
     last = _load_last_run()
     prev_assignments = last["assignments"] if last else []

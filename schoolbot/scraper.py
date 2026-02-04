@@ -215,6 +215,7 @@ def _extract_calendar_events(page: Page) -> list[dict]:
                     start: start,
                     all_day: e.allDay || false,
                     type: (e.className || []).includes("assignment-icon") ? "assignment" : "event",
+                    url: e.url || "",
                 };
             });
         } catch(err) {
