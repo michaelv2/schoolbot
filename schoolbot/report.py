@@ -987,9 +987,9 @@ def _render_html(
             {overdue_rows}
         </table>'''}
 
-        {grades_section}
-
         {recent_section}
+
+        {grades_section}
 
         <p style="color:#999;font-size:12px;margin-top:24px;">
             Sent by {bot_name}

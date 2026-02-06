@@ -1,0 +1,57 @@
+Using course: SCIENCE 8: Cooper 8 Science YELLOW (ID: 8000539026)
+
+=== Manual deep dive: MP1 > Week 1 > Tuesday ===
+Found 2 items inside Tuesday:
+  [link        ] Class Syllabus
+    href=/course/8000539026/materials/link/view/8003679851
+    fid=
+  [link        ] Kahoot on Safety and Measurement
+    href=/course/8000539026/materials/link/view/8009741888
+    fid=
+
+=== Raw DOM: first 5 content rows ===
+  class=dr type-document odd  id=n-8003679851
+  html=<td class="folder-contents-cell">
+        <div class="s-material-folder-row-wrapper">
+          <span class="inline-icon link-icon "><span class="visually-hidden">Web Link</span></span>
+          <div
+
+  class=dr type-document even  id=n-8009741888
+  html=<td class="folder-contents-cell">
+        <div class="s-material-folder-row-wrapper">
+          <span class="inline-icon link-icon "><span class="visually-hidden">Web Link</span></span>
+          <div
+
+
+=== Recursive crawl: MP1 > Week 1 only (max_depth=4) ===
+[folder      ] Tuesday  fid=941233939
+  [folder      ] Class Syllabus  resolved=/course/8000539026/materials?f=941233939  fid=941233939
+  [link        ] Kahoot on Safety and Measurement  href=/course/8000539026/materials/link/view/8009741888
+[folder      ] Wednesday  fid=941235069
+  [folder      ] How Scientific Is It?  resolved=/course/8000539026/materials?f=941233939  fid=941233939
+  [document    ] Safety Packet.pdf  href=/course/8000539026/materials/gp/8009891310
+  [link        ] Safety Contract  href=/course/8000539026/materials/link/view/8003683433
+  [document    ] FLINN Lab Safety Video  href=/external_tool/3283759365/launch
+[folder      ] Thursday  fid=942809192
+  [folder      ] Lab Equipment Need to Knows  fid=943355214
+    [link        ] Key to Lab Equipment CER  href=/course/8000539026/materials/link/view/8014832341
+    [link        ] Practice Quiz on Lab Equipment  href=/course/8000539026/materials/link/view/8015027699
+    [link        ] Master List of 20 Pieces of Lab Equipment  href=/course/8000539026/materials/link/view/8015281945
+  [folder      ] Key to Safety Packet  resolved=/course/8000539026/materials?f=941235069  fid=941235069
+  [link        ] Lab Equipment CER Notes  href=/course/8000539026/materials/link/view/8011522365
+[folder      ] Friday  fid=942821655
+  [folder      ] Measuring Stations Lab  resolved=/course/8000539026/materials?f=942809192  fid=942809192
+  [link        ] Answers to today's lab-Submission form  href=/course/8000539026/materials/link/view/8014613303
+
+Flattened: 9 leaf items
+  [link        ] Kahoot on Safety and Measurement  folder=Tuesday
+  [document    ] Safety Packet.pdf  folder=Wednesday
+  [link        ] Safety Contract  folder=Wednesday
+  [document    ] FLINN Lab Safety Video  folder=Wednesday
+  [link        ] Key to Lab Equipment CER  folder=Thursday/Lab Equipment Need to Knows
+  [link        ] Practice Quiz on Lab Equipment  folder=Thursday/Lab Equipment Need to Knows
+  [link        ] Master List of 20 Pieces of Lab Equipment  folder=Thursday/Lab Equipment Need to Knows
+  [link        ] Lab Equipment CER Notes  folder=Thursday
+  [link        ] Answers to today's lab-Submission form  folder=Friday
+
+Type counts: {'link': 7, 'document': 2}

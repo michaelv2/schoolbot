@@ -1,0 +1,11 @@
+Scraping Schoology...
+  Found 0 assignments, 9 grades
+  Scraping materials for 'Unit 6 Math "Quest" is on Friday 2/6' (course 8000526914)...
+  No extractable text for 'Unit 6 Math "Quest" is on Friday 2/6' — using course link
+  Generating student feedback...
+  Warning: student feedback generation failed: "Could not resolve authentication method. Expected either api_key or auth_token to be set. Or for one of the `X-Api-Key` or `Authorization` headers to be explicitly omitted"
+SchoolBot report sent to william.wagg@icloud.com, michael.wagg@gmail.com
+ParentBot report sent to michael.wagg@gmail.com, thaosan@gmail.com
+  1 upcoming test(s)/quiz(zes)
+  2 overdue assignment(s)
+  3 new assignment(s)
